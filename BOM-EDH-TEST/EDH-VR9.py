@@ -7,7 +7,7 @@ from tkinter import Tk, filedialog
 from tkinter import filedialog, messagebox
 from datetime import datetime
 
-# PY VER-2.0.2 APR|08|04|2025
+# PY VER-1.0.1 APR|03|04|2025
 
 # ============================ Program 1: BOM EDH Analyser ============================
 def pro_1():
@@ -337,117 +337,56 @@ def pro_2():
     
     print("\n")
     
-    import os
-    import pandas as pd
-    import tkinter as tk
-    from tkinter import filedialog
-    from datetime import datetime
-
-    # Constants
+    # Define target folder
     TARGET_FOLDER = r'D:\MPNlibrary'
     MPN_LIBRARY_FILE = os.path.join(TARGET_FOLDER, 'MPNLibrary.xlsx')
-    MISMATCH_FILE = os.path.join(TARGET_FOLDER, 'MissMatch_MPNLibrary.xlsx')
-    DUPLICATE_LOG = os.path.join(TARGET_FOLDER, 'Duplicate_Entries.txt')
-    REQUIRED_COLUMNS = ['MPN', 'TYPE', 'CID', 'PKG', 'SDJ']
+    DUPLICATE_FILE = os.path.join(TARGET_FOLDER, 'Duplicate_MPNLibrary.xlsx')
+    ALLOWED_EXTENSIONS = {'xls', 'xlsx'}
 
     # Ensure target folder exists
     os.makedirs(TARGET_FOLDER, exist_ok=True)
 
-    def browse_and_append():
-        # Hide root tkinter window
-        root = tk.Tk()
-        root.withdraw()
+    # Function to check file extension
+    def allowed_file(filename):
+        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-        file_path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx;*.xls")])
-        if not file_path:
-            print("No file selected.")
-            return
+    # Open file dialog
+    root = Tk()
+    root.withdraw()  # Hide the root window
+    file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xls;*.xlsx")])
 
-        try:
-            excel_file_name = os.path.basename(file_path)
-            current_time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-            new_df = pd.read_excel(file_path)
-
-            if not all(col in new_df.columns for col in REQUIRED_COLUMNS):
-                print(f"ERROR: File must contain columns: {REQUIRED_COLUMNS}")
-                return
-
-            # Filter to required columns only
-            new_df = new_df[REQUIRED_COLUMNS].copy()
-
-            # Check for missing values
-            missing_rows = new_df[new_df.isnull().any(axis=1)]
-            if not missing_rows.empty:
-                print("\n⚠️ Warning: Some rows have empty cells in required columns:\n")
-                print(missing_rows)
-                choice = input("\nDo you want to continue importing? (Y/N): ").strip().lower()
-                if choice != 'y':
-                    print("Import aborted by user.")
-                    return
+    if file_path:
+        if allowed_file(file_path):
+            try:
+                # Read new Excel file
+                df_new = pd.read_excel(file_path, usecols=['MPN', 'TYPE', 'CID', 'PKG', 'SDJ'])
+                
+                # Load existing MPNLibrary if it exists
+                if os.path.exists(MPN_LIBRARY_FILE):
+                    df_existing = pd.read_excel(MPN_LIBRARY_FILE)
+                    
+                    # Find duplicates
+                    df_duplicates = df_existing.merge(df_new, on=['MPN', 'TYPE', 'CID', 'PKG', 'SDJ'], how='inner')
+                    if not df_duplicates.empty:
+                        print("Duplicate data found. Saving to Duplicate_MPNLibrary.xlsx")
+                        df_duplicates.to_excel(DUPLICATE_FILE, index=False)
+                    
+                    # Append new data
+                    df_combined = pd.concat([df_existing, df_new]).drop_duplicates()
                 else:
-                    new_df = new_df.dropna()  # Drop rows with empty cells before proceeding
-
-            new_df['UPD'] = pd.Timestamp.now()
-
-            # Load existing MPNLibrary if exists
-            if os.path.exists(MPN_LIBRARY_FILE):
-                existing_df = pd.read_excel(MPN_LIBRARY_FILE)
-            else:
-                existing_df = pd.DataFrame(columns=REQUIRED_COLUMNS + ['UPD'])
-
-            append_list = []
-            duplicate_entries = []
-            mismatch_records = []
-
-            for _, new_row in new_df.iterrows():
-                mpn_matches = existing_df[existing_df['MPN'] == new_row['MPN']]
-
-                if not mpn_matches.empty:
-                    exact_match = mpn_matches[
-                        (mpn_matches['TYPE'] == new_row['TYPE']) &
-                        (mpn_matches['CID'] == new_row['CID']) &
-                        (mpn_matches['PKG'] == new_row['PKG']) &
-                        (mpn_matches['SDJ'] == new_row['SDJ'])
-                    ]
-                    if not exact_match.empty:
-                        duplicate_entries.append((new_row.to_dict(), excel_file_name, current_time_str))
-                        continue
-                    else:
-                        for _, mismatch_row in mpn_matches.iterrows():
-                            mismatch_records.append(mismatch_row)
-                        mismatch_records.append(new_row)
-                        continue
-
-                append_list.append(new_row)
-
-            if append_list:
-                final_append_df = pd.DataFrame(append_list)
-                updated_df = pd.concat([existing_df, final_append_df], ignore_index=True)
-                updated_df.to_excel(MPN_LIBRARY_FILE, index=False)
-                print(f"\n✅ {len(append_list)} new record(s) appended to MPNLibrary.xlsx")
-            else:
-                print("\nℹ️ No new records to append.")
-
-            if mismatch_records:
-                mismatch_df = pd.DataFrame(mismatch_records)
-                mismatch_df.to_excel(MISMATCH_FILE, index=False)
-                print(f"⚠️ {len(mismatch_records)} mismatch record(s) saved to MissMatch_MPNLibrary.xlsx")
-
-            if duplicate_entries:
-                with open(DUPLICATE_LOG, 'a') as f:
-                    for entry, file_name, timestamp in duplicate_entries:
-                        line = ', '.join([str(entry[col]) for col in REQUIRED_COLUMNS])
-                        f.write(f"{line} | File: {file_name} | Time: {timestamp}\n")
-                print(f"⚠️ {len(duplicate_entries)} duplicate record(s) logged in Duplicate_Entries.txt")
-
-        except Exception as e:
-            print(f"❌ ERROR: {e}")
-
-    if __name__ == "__main__":
-        browse_and_append()
-            
-    input("\nPress Enter to return to the menu...")
+                    df_combined = df_new
+                
+                # Save updated MPNLibrary
+                df_combined.to_excel(MPN_LIBRARY_FILE, index=False)
+                print(f'File saved to {MPN_LIBRARY_FILE}')
+            except Exception as e:
+                print(f'Error processing file: {str(e)}')
+        else:
+            print('Invalid file format. Only .xls and .xlsx allowed.')
+    else:
+        print('No file selected.')
+        
+        input("\nPress Enter to return to the menu...")  
 #-------------------------------------------------------------------------------------------------------------------
 # ============================ Program 3: MPN Library Lookup EDH ============================
 def pro_3():
@@ -456,60 +395,75 @@ def pro_3():
     
     print("\n")
     
-    import pandas as pd
-    from tkinter import filedialog, Tk
-    import os
+    def browse_file():
+        root = tk.Tk()
+        root.withdraw()  # Hide the root window
+        file_path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xlsx;*.xls")])
+        return file_path
 
-    # Paths
-    MPN_LIBRARY_PATH = r"D:\MPNlibrary\MPNLibrary.xlsx"
+    def update_excel_file(file_path):
+        if not file_path:
+            print("No file selected.")
+            return
+        
+        # Load the browsed Excel file
+        try:
+            df_browsed = pd.read_excel(file_path, dtype=str)
+        except Exception as e:
+            print(f"Error loading browsed file: {e}")
+            return
+        
+        required_headers = ['CRD', 'DES', 'MFG', 'MPN', 'QTY', 'TYPE', 'CID', 'PKG', 'SDJ']
+        if not all(header in df_browsed.columns for header in required_headers):
+            print("The browsed file does not contain the required headers.")
+            return
+        
+        # Load MPNLibrary.xlsx
+        mpn_library_path = r'D:\MPNlibrary\MPNLibrary.xlsx'
+        if not os.path.exists(mpn_library_path):
+            print("MPNLibrary.xlsx not found in D:\\MPNlibrary.")
+            return
+        
+        try:
+            df_library = pd.read_excel(mpn_library_path, dtype=str)
+        except Exception as e:
+            print(f"Error loading MPNLibrary.xlsx: {e}")
+            return
+        
+        required_lib_headers = ['MPN', 'TYPE', 'CID', 'PKG', 'SDJ']
+        if not all(header in df_library.columns for header in required_lib_headers):
+            print("MPNLibrary.xlsx does not contain the required headers.")
+            return
+        
+        # Merge data based on 'MPN'
+        df_updated = df_browsed.merge(df_library, on='MPN', how='left', suffixes=('', '_new'))
+        
+        # Replace 'TYPE', 'PKG', 'SDJ' if MPN matches
+        for column in ['TYPE', 'CID', 'PKG', 'SDJ']:
+            df_updated[column] = df_updated[column + '_new'].combine_first(df_updated[column])
+            df_updated.drop(columns=[column + '_new'], inplace=True)
+        
+        # Save back to the original file
+        df_updated.to_excel(file_path, index=False)
+        print(f"File updated and saved: {file_path}")
 
-    # Load MPNLibrary
-    if not os.path.exists(MPN_LIBRARY_PATH):
-        print("❌ MPNLibrary.xlsx not found.")
-        exit()
-
-    df_library = pd.read_excel(MPN_LIBRARY_PATH, usecols=['MPN', 'TYPE', 'CID', 'PKG', 'SDJ'])
-    df_library['MPN'] = df_library['MPN'].astype(str).str.strip()
-
-    # Select BOM file
-    root = Tk()
-    root.withdraw()
-    bom_path = filedialog.askopenfilename(title="Select BOM file", filetypes=[("Excel files", "*.xls;*.xlsx")])
-
-    if not bom_path:
-        print("❌ No BOM file selected.")
-        exit()
-
-    df_bom = pd.read_excel(bom_path)
-    df_bom['MPN'] = df_bom['MPN'].astype(str).str.strip()
-
-    # Merge BOM with library, keeping only the columns to update
-    df_updated = df_bom.merge(df_library, on='MPN', how='left', suffixes=('', '_lib'))
-
-    # Update only TYPE, CID, PKG, SDJ in BOM if MPN matches
-    for col in ['TYPE', 'CID', 'PKG', 'SDJ']:
-        df_updated[col] = df_updated[f'{col}_lib'].combine_first(df_updated[col])
-        df_updated.drop(columns=[f'{col}_lib'], inplace=True)
-
-    # Save updated BOM
-    updated_path = os.path.splitext(bom_path)[0] + "_UpdatedWithMPNLibrary.xlsx"
-    df_updated.to_excel(updated_path, index=False)
-    print(f"✅ BOM updated and saved at: {updated_path}")
-
-            
-    input("\nPress Enter to return to the menu...")
-    
+    if __name__ == "__main__":
+        file_to_update = browse_file()
+        update_excel_file(file_to_update)
+        
+        input("\nPress Enter to return to the menu...")  
+        
 #-------------------------------------------------------------------------------------------------------------------
 
 def main():
     while True:  
-        print("\033[92;40mBOM EDH\033[0m \033[1;34;40mSYRMA\033[0m \033[1;36;40mSGS\033[0m \n\n\033[92;40mBOM EDH PY V-4.0.0 APR|08|04|2025  \033[0m")
+        print("\033[92;40mBOM EDH\033[0m \033[1;34;40mSYRMA\033[0m \033[1;36;40mSGS\033[0m \n\n\033[92;40mBOM EDH PY V-3.0.0 APR|06|04|2025  \033[0m")
         print("\n")
         print("\033[1;36;40mSelect a program:\033[0m")
         print("\n")
         print("1. BOM EDH Analyser: V-2.0.0")  
-        print("2. MPN Library Creator: V-2.0.1")  
-        print("3. MPN Library Lookup EDH: V-2.0.1")  
+        print("2. MPN Library Creator: V-1.0.0")  
+        print("3. MPN Library Lookup EDH: V-1.0.0")  
         print("\n")
         print("X. \033[1;31;40mExit Program\033[0m")  
         print("\n")
@@ -530,7 +484,7 @@ def main():
             root = tk.Tk()
             root.withdraw()  
             messagebox.showinfo("Program Terminated", "Exiting the Program")
-            messagebox.showinfo("Program Description", "PROGRAM NAME 'BOM-EDH-VR11,1VR-1,2VR-6-9,3VR-6-2'\n\n'PY V-4.0.0 APR|08|04|2025' brief note on STANDALONE SOFTWARE 'Application to help BOM segeration'\n\nMIT License\n\nCopyright (C) <2025>  <BALA GANESH>\n\n")
+            messagebox.showinfo("Program Description", "PROGRAM NAME 'BOM-EDH-VR9' 'PY V-3.0.0 APR|06|04|2025' brief note on STANDALONE SOFTWARE 'Application to help BOM segeration'\n\nMIT License\n\nCopyright (C) <2025>  <BALA GANESH>\n\n")
             sys.exit()
         else:
             print("Invalid choice. Please try again.\n")

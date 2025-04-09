@@ -373,21 +373,7 @@ def pro_2():
                 print(f"ERROR: File must contain columns: {REQUIRED_COLUMNS}")
                 return
 
-            # Filter to required columns only
             new_df = new_df[REQUIRED_COLUMNS].copy()
-
-            # Check for missing values
-            missing_rows = new_df[new_df.isnull().any(axis=1)]
-            if not missing_rows.empty:
-                print("\n⚠️ Warning: Some rows have empty cells in required columns:\n")
-                print(missing_rows)
-                choice = input("\nDo you want to continue importing? (Y/N): ").strip().lower()
-                if choice != 'y':
-                    print("Import aborted by user.")
-                    return
-                else:
-                    new_df = new_df.dropna()  # Drop rows with empty cells before proceeding
-
             new_df['UPD'] = pd.Timestamp.now()
 
             # Load existing MPNLibrary if exists
@@ -425,24 +411,24 @@ def pro_2():
                 final_append_df = pd.DataFrame(append_list)
                 updated_df = pd.concat([existing_df, final_append_df], ignore_index=True)
                 updated_df.to_excel(MPN_LIBRARY_FILE, index=False)
-                print(f"\n✅ {len(append_list)} new record(s) appended to MPNLibrary.xlsx")
+                print(f"{len(append_list)} new record(s) appended to MPNLibrary.xlsx")
             else:
-                print("\nℹ️ No new records to append.")
+                print("No new records to append.")
 
             if mismatch_records:
                 mismatch_df = pd.DataFrame(mismatch_records)
                 mismatch_df.to_excel(MISMATCH_FILE, index=False)
-                print(f"⚠️ {len(mismatch_records)} mismatch record(s) saved to MissMatch_MPNLibrary.xlsx")
+                print(f"{len(mismatch_records)} mismatch record(s) saved to MissMatch_MPNLibrary.xlsx")
 
             if duplicate_entries:
                 with open(DUPLICATE_LOG, 'a') as f:
                     for entry, file_name, timestamp in duplicate_entries:
                         line = ', '.join([str(entry[col]) for col in REQUIRED_COLUMNS])
                         f.write(f"{line} | File: {file_name} | Time: {timestamp}\n")
-                print(f"⚠️ {len(duplicate_entries)} duplicate record(s) logged in Duplicate_Entries.txt")
+                print(f"{len(duplicate_entries)} duplicate record(s) logged in Duplicate_Entries.txt")
 
         except Exception as e:
-            print(f"❌ ERROR: {e}")
+            print(f"ERROR: {e}")
 
     if __name__ == "__main__":
         browse_and_append()
@@ -530,7 +516,7 @@ def main():
             root = tk.Tk()
             root.withdraw()  
             messagebox.showinfo("Program Terminated", "Exiting the Program")
-            messagebox.showinfo("Program Description", "PROGRAM NAME 'BOM-EDH-VR11,1VR-1,2VR-6-9,3VR-6-2'\n\n'PY V-4.0.0 APR|08|04|2025' brief note on STANDALONE SOFTWARE 'Application to help BOM segeration'\n\nMIT License\n\nCopyright (C) <2025>  <BALA GANESH>\n\n")
+            messagebox.showinfo("Program Description", "PROGRAM NAME 'BOM-EDH-VR10,1VR-1,2VR-6-8,3VR-6-2'\n\n'PY V-4.0.0 APR|08|04|2025' brief note on STANDALONE SOFTWARE 'Application to help BOM segeration'\n\nMIT License\n\nCopyright (C) <2025>  <BALA GANESH>\n\n")
             sys.exit()
         else:
             print("Invalid choice. Please try again.\n")
